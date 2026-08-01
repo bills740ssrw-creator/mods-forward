@@ -3,6 +3,8 @@ import json
 import os
 import asyncio
 import base64
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from telethon import TelegramClient, events
 from telethon.errors import FloodWaitError
 from telethon.tl.types import MessageService, MessageMediaWebPage
@@ -158,6 +160,23 @@ async def handler(event):
     await process_message(msg, s)
     progress[s] = msg.id
     save_progress(progress)
+
+# ===== KEEP-ALIVE HTTP SERVER (Render health check) =====
+
+class HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"ok")
+    def log_message(self, format, *args):
+        pass
+
+def run_http_server():
+    port = int(os.environ.get("PORT", 8000))
+    server = HTTPServer(("0.0.0.0", port), HealthHandler)
+    server.serve_forever()
+
+threading.Thread(target=run_http_server, daemon=True).start()
 
 # ===== MAIN =====
 
